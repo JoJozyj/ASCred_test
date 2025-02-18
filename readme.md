@@ -1,9 +1,11 @@
-Implementation of Rai-Choo!
+Implementation of Rai-Choo(Batch version)!
 ===========================
 
 This repository contains a prototypical implementation of the [Rai-Choo! blind signature scheme](https://eprint.iacr.org/2022/1350.pdf).
+The original repository is https://github.com/b-wagn/Raichoo.git
+We implement the batch partial blind siganture of Rai-Choo.
 
-
+The implementation is same as https://github.com/b-wagn/Raichoo.git. 
 ## Dependencies
 Before compilation, first ensure that the `gmp` dependency is installed.
 For that, install `libgmp3-dev` using 
