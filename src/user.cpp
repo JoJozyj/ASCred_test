@@ -5,8 +5,8 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <nlohmann/json.hpp> // 引入 nlohmann/json 库
-#include <cstring> // 包含字符串处理函数的头文件
+#include <nlohmann/json.hpp> 
+#include <cstring> 
 using json = nlohmann::json;
 #include <future>
 #include <cstring>
@@ -57,7 +57,7 @@ std::future<void> process_mu_hashes_async(int i, int j, const unsigned char* mes
     });
 }
 
-// 异步任务：处理 com 和 alpha
+
 std::future<void> process_com_and_alpha_async(int i, int j, unsigned char* rand, unsigned char* com,
                                                user_state* state) {
     return std::async(std::launch::async, [i, j, rand, com, state]() {
@@ -71,7 +71,6 @@ std::future<void> process_com_and_alpha_async(int i, int j, unsigned char* rand,
     });
 }
 
-// 异步任务：处理 c 和 mu
 std::future<void> process_c_and_mu_async(int i, int j, unsigned char* rand, user_state* state, G1& g1alpha) {
     return std::async(std::launch::async, [i, j, rand, state, &g1alpha]() {
         for (int c = 0; c < PAR_L; ++c) {
@@ -88,12 +87,11 @@ void user_challenge(const context *ctx, const publickey *pk,
 		const unsigned char *info, const unsigned char *messagedigest,
 		user_state *state, challenge *chall) {
 
-	std::vector<std::future<void>> futures;  // 用于保存异步任务的future对象
+	std::vector<std::future<void>> futures;  
     unsigned char rand[PAR_K * PAR_N * (PAR_L + 1) * SECPAR];
     unsigned char com[PAR_K * PAR_N * SECPAR];
     G1 g1alpha;
 
-    // 异步并行化 PAR_K 和 PAR_N 的循环
     for (int i = 0; i < PAR_K; ++i) {
         for (int j = 0; j < PAR_N; ++j) {
             // 异步处理 mu hashes
@@ -102,12 +100,10 @@ void user_challenge(const context *ctx, const publickey *pk,
             // 异步处理 com 和 alpha
             futures.push_back(process_com_and_alpha_async(i, j, rand, com, state));
 
-            // 异步处理 c 和 mu
             futures.push_back(process_c_and_mu_async(i, j, rand, state, std::ref(g1alpha)));
         }
     }
 
-    // 等待所有异步任务完成
     for (auto& future : futures) {
         future.get();
     }
@@ -337,7 +333,7 @@ bool user_finalize_not_optimize(user_state *state, challenge *chall, response *r
         outFile.write(reinterpret_cast<const char*>(&sig), sizeof(sig));
         outFile.close();
     } else {
-        std::cerr << "无法打开文件进行写入" << std::endl;
+        std::cerr << "cannot open file" << std::endl;
     }
 	std::cout << "user_finalize over 2  file make  " << std::endl;
 	return true;
