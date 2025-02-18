@@ -7,8 +7,7 @@
 
 #include <iostream>
 #include <chrono>
-//#include <nlohmann/json.hpp> // 引入 nlohmann/json 库
-#include <cstring> // 包含字符串处理函数的头文件
+#include <cstring> 
 
 #include "parameters.hpp"
 #include "context.hpp"
@@ -64,16 +63,7 @@ void test_correctness() {
 void test_time() {
 
 	std::cout << "N = " << PAR_N << ", K = " << PAR_K << ", L = " << PAR_L <<std::endl;
-	//json data = {
-    //{"name", "Johnee"},
-    //{"age", 300},
-    //{"city", "New York"}
-	//};
-	//std::cout << "data: " << data << std::endl;
 
-	// 将 JSON 对象转换为字符串
-	//std::string json_string = data.dump();
-	//std::cout << "string: " << json_string << std::endl;
 
 	context *ctx = create_context();
 
