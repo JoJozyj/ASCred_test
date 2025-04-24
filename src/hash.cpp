@@ -31,6 +31,17 @@ void hash_r(const unsigned char *rand, uint32_t L, unsigned char *com) {
 	SHA256_Final(com, &sha256);
 }
 
+void hash_alpha_ori(const unsigned char *gamma, uint32_t l, Fr &alpha) {
+	//concat a tag, gamma, and l
+	size_t hashinput_len = 4 + SECPAR + 4;
+	unsigned char hashinput[hashinput_len] = "ALPH";
+	memcpy(&hashinput[4], gamma, SECPAR);
+	memcpy(&hashinput[4 + SECPAR], &l, 4);
+
+	//hash using MCL
+	alpha.setHashOf(hashinput, hashinput_len);
+}
+
 void hash_alpha(const unsigned char *gamma, uint32_t l, Fr &alpha) {
 	//concat a tag, gamma, and l
 	size_t hashinput_len = 4 + SECPAR + 4;

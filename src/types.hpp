@@ -35,8 +35,9 @@ typedef struct secretkey {
  */
 typedef struct signature {
 	publickey pk_sharing[PAR_K - 1];
-	unsigned char com_rands[PAR_K * SECPAR];
-	G1 agg_sig;
+	unsigned char com_rands[PAR_K * SECPAR][PAR_L * SECPAR];
+	G1 agg_sig[PAR_L];
+	G1 single_sig;
 } signature;
 
 /**
@@ -45,8 +46,8 @@ typedef struct signature {
  */
 typedef struct challenge {
 	uint32_t J[PAR_K];
-	G1 c[PAR_K];
-	unsigned char rand[PAR_K * (PAR_N - 1) * 2 * SECPAR];
+	G1 c[PAR_L][PAR_K];
+	unsigned char rand[PAR_K * (PAR_N - 1) * (PAR_L + 1) * SECPAR];
 	unsigned char com[PAR_K * SECPAR];
 } challenge;
 
@@ -56,7 +57,7 @@ typedef struct challenge {
  */
 typedef struct response {
 	publickey pk_sharing[PAR_K - 1];
-	G1 agg_resp;
+	G1 agg_resp[PAR_L];
 } response;
 
 #endif

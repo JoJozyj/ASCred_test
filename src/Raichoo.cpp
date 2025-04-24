@@ -7,6 +7,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <nlohmann/json.hpp> // 引入 nlohmann/json 库
+#include <cstring> // 包含字符串处理函数的头文件
 
 #include "parameters.hpp"
 #include "context.hpp"
@@ -16,8 +18,9 @@
 #include "signer.hpp"
 #include "gen.hpp"
 #include "ver.hpp"
+using json = nlohmann::json;
 
-#define RUNS 100.0
+#define RUNS 1.0
 
 void test_correctness() {
 
@@ -60,11 +63,22 @@ void test_correctness() {
 
 void test_time() {
 
-	std::cout << "N = " << PAR_N << ", K = " << PAR_K << std::endl;
+	std::cout << "N = " << PAR_N << ", K = " << PAR_K << ", L = " << PAR_L <<std::endl;
+	json data = {
+    {"name", "Johnee"},
+    {"age", 300},
+    {"city", "New York"}
+	};
+	std::cout << "data: " << data << std::endl;
+
+	// 将 JSON 对象转换为字符串
+	std::string json_string = data.dump();
+	std::cout << "string: " << json_string << std::endl;
 
 	context *ctx = create_context();
 
 	unsigned char messagedigest[SECPAR];
+	//std::memcpy(messagedigest, json_string.c_str(), std::min(json_string.length(), (size_t)SECPAR));
 	unsigned char info[SECPAR];
 	memset(info, 0x01, SECPAR);
 
@@ -83,12 +97,19 @@ void test_time() {
 
 	//run RUNS signing interactions
 	for (int run = 0; run < RUNS; ++run) {
+		//std::cout << "message: " <<  messagedigest << std::endl;
 		random_bytes(messagedigest, SECPAR);
-
+		std::cout << "message: " <<  messagedigest << std::endl;
+		std::cout << "ctx: " <<  ctx << std::endl;
+		std::cout << "pk: " <<  &pk << std::endl;
+		std::cout << "info: " <<  info << std::endl;
+		std::cout << "messagedigest: " <<  messagedigest << std::endl;
+		std::cout << "state: " <<  &state << std::endl;
+		std::cout << "chall: " <<  &chall << std::endl;
 		auto start_sign = std::chrono::high_resolution_clock::now();
-		// Signing Protocol: User
+		std::cout << "start user_chanllenge " << std::endl;
 		user_challenge(ctx, &pk, info, messagedigest, &state, &chall);
-
+		std::cout << "finish user_chanllenge " << std::endl;
 		// Signing Protocol: Signer
 		signer(ctx, &pk, &sk, info, &chall, &resp);
 
@@ -100,12 +121,12 @@ void test_time() {
 				std::chrono::duration_cast<std::chrono::milliseconds>(
 						stop_sign - start_sign).count();
 
-		// Verification
-		auto start_ver = std::chrono::high_resolution_clock::now();
-		ver(ctx, &pk, info, messagedigest, sig);
-		auto stop_ver = std::chrono::high_resolution_clock::now();
-		duration_verification += std::chrono::duration_cast<
-				std::chrono::milliseconds>(stop_ver - start_ver).count();
+		 //Verification
+		 auto start_ver = std::chrono::high_resolution_clock::now();
+		 ver(ctx, &pk, info, messagedigest, sig);
+		 auto stop_ver = std::chrono::high_resolution_clock::now();
+		 duration_verification += std::chrono::duration_cast<
+		 std::chrono::milliseconds>(stop_ver - start_ver).count();
 	}
 	duration_signing /= RUNS;
 	std::cout << "Av. Time Signing [ms]: " << duration_signing << std::endl;

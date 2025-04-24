@@ -15,12 +15,22 @@
  * A struct that is holding the users state
  * in an execution of the signing protocol
  */
-typedef struct user_state {
+typedef struct user_state_ori {
 	G1 mu_hashes[PAR_N * PAR_K];
 	G1 c[PAR_N * PAR_K];
 	Fr alphas[PAR_N * PAR_K];
 
 	unsigned char varphis[PAR_K * PAR_N * SECPAR];
+	const context *ctx;
+	const publickey *pk;
+} user_state_ori;
+
+typedef struct user_state {
+	G1 mu_hashes[PAR_N * PAR_K * PAR_L];
+	G1 c[PAR_N * PAR_K * PAR_L];
+	Fr alphas[PAR_N * PAR_K * PAR_L];
+
+	unsigned char varphis[PAR_K * PAR_N * PAR_L * SECPAR];
 	const context *ctx;
 	const publickey *pk;
 } user_state;

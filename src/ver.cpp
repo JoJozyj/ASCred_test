@@ -52,10 +52,10 @@ bool ver(const context *ctx, const publickey *pk, unsigned char *info,
 	// Step 3: recompute mus and their hashes
 	for (int i = 0; i < PAR_K; ++i) {
 		unsigned char mu[SECPAR];
-		hash_mu(messagedigest, &(sig.com_rands[i * SECPAR]), mu);
+		hash_mu(messagedigest, sig.com_rands[i * SECPAR], mu);
 		hash_bls(mu, info, hashes_and_agg_sig[i]);
 	}
-	G1::neg(hashes_and_agg_sig[PAR_K], sig.agg_sig);
+	G1::neg(hashes_and_agg_sig[PAR_K], sig.single_sig);
 
 	// Step 4: Verification equation
 	millerLoopVec(tmp, hashes_and_agg_sig, pks_and_g2, PAR_K + 1);

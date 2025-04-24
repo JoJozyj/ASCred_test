@@ -22,6 +22,7 @@ using namespace mcl::bn;
 #define NUMBYTESG1ELEMENT 48
 
 #define MEDIUM_N_PARS
+#define PAR_L 15
 
 /*************SYSTEM*PARAMETERS**************/
 // PAR_N: number of sessions per instance

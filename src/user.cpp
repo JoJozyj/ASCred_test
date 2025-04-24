@@ -1,6 +1,13 @@
 #include "user.hpp"
 #include "hash.hpp"
 #include "random.hpp"
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <nlohmann/json.hpp> // 引入 nlohmann/json 库
+#include <cstring> // 包含字符串处理函数的头文件
+using json = nlohmann::json;
 
 /**
  * pk_sharing: K-1 elements
@@ -42,60 +49,82 @@ void user_challenge(const context *ctx, const publickey *pk,
 		user_state *state, challenge *chall) {
 
 	// save pk and ctx for later
+	//std::cout << "start user_chanllenge " << std::endl;
 	state->pk = pk;
 	state->ctx = ctx;
 
 	// some tmp element for computation
 	G1 g1alpha;
-
-	unsigned char rand[PAR_K * PAR_N * 2 * SECPAR];
+	//std::cout << "g1alpha" << std::endl;
+	unsigned char rand[PAR_K * PAR_N * PAR_L* 2 * SECPAR];
 	unsigned char com[PAR_K * PAR_N * SECPAR];
+	//std::cout << "define rand com " << std::endl;
 
 	// prepare mu's, alpha's, com's, c's
-	// for every instance and every session
+	// for every instance and every session and every message
 	for (int i = 0; i < PAR_K; ++i) {
 		for (int j = 0; j < PAR_N; ++j) {
-			int idx = i * PAR_N + j;
-			// sample varphi_{i,j}
-			random_bytes(&state->varphis[idx * SECPAR], SECPAR);
-
-			// compute mu_{i,j}
-			hash_mu(messagedigest, &state->varphis[idx * SECPAR],
-					&rand[idx * 2 * SECPAR]);
+			int idx = (i * PAR_N) + j;
+			for(int l = 0;l < PAR_L; ++l){
+				int idx_r = (i * PAR_N + j) * PAR_L + l;    
+				//std::cout << "idx_r " <<idx_r<<  std::endl;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+				// sample varphi_{i,j,l}
+				random_bytes(&state->varphis[idx_r * SECPAR], SECPAR);
+				//std::cout << "random_bytes " << std::endl;
+				// compute mu_{i,j,l}
+				hash_mu(messagedigest, &state->varphis[idx_r * SECPAR],
+						&rand[idx * (PAR_L+ 1)* SECPAR  + l * SECPAR ]);
+			}
 			//sample gamma_{i,j} next to it
-			random_bytes(&rand[idx * 2 * SECPAR + SECPAR], SECPAR);
+			random_bytes(&rand[ (idx+1)*(PAR_L+1) * SECPAR - SECPAR], SECPAR);
 
 			// compute com_{i,j}
-			hash_r(&rand[idx * 2 * SECPAR], 1, &com[idx * SECPAR]);
+			hash_r(&rand[idx * (PAR_L + 1) * SECPAR], PAR_L , &com[idx * SECPAR]);
+			//std::cout << "hash_r " << std::endl;
+			// compute alpha_{i,j,l}  
+			for(int p = 0;p < PAR_L;++p){
+				int idx_p = (i * PAR_N + j) * PAR_L + p;
+				hash_alpha(&rand[(idx+1)*(PAR_L+1) * SECPAR - SECPAR], p, state->alphas[idx_p]);
+			}
 
-			// compute alpha_{i,j}
-			hash_alpha(&rand[idx * 2 * SECPAR + SECPAR], 0, state->alphas[idx]);
-
-			// compute c_{i,j}
-			hash_bls(&rand[idx * 2 * SECPAR], info, state->mu_hashes[idx]);
-			G1::mul(g1alpha, ctx->g1, state->alphas[idx]);
-			G1::add(state->c[idx], state->mu_hashes[idx], g1alpha);
+			// compute c_{i,j,l}
+			for(int c = 0;c < PAR_L;++c){
+				int idx_c = (i * PAR_N + j) * PAR_L + c;
+				hash_bls(&rand[idx * (PAR_L+ 1)* SECPAR  + c * SECPAR ], info, state->mu_hashes[idx_c]);
+				//std::cout << "hash_bls " << std::endl;
+				G1::mul(g1alpha, ctx->g1, state->alphas[idx_c]);
+				G1::add(state->c[idx_c], state->mu_hashes[idx_c], g1alpha);
+			}	
 		}
 	}
+	//std::cout << "first loop over " << std::endl;
 
 	// hash to get the CC vector J
-	hash_cc(com, state->c, 1, chall->J);
-
+	hash_cc(com, state->c, PAR_L, chall->J);
+	//std::cout << "hash_cc " << std::endl;
 	// construct the challenge/opening and the user state
 	for (int i = 0; i < PAR_K; ++i) {
-		int Ji = chall->J[i];
-		int idx = i * PAR_N + Ji;
-		//include c_{i,J_i} and com_{i,J_i}
-		chall->c[i] = state->c[idx];
-		memcpy(&chall->com[i * SECPAR], &com[idx * SECPAR], SECPAR);
+		int Ji = chall->J[i];     
+		int idx = i * PAR_N + Ji;                                                            
+		int idx_c = (i * PAR_N + Ji) * PAR_L;
+		//include c_{i,J_i,l} and com_{i,J_i}
+		for(int l = 0; l < PAR_L; ++l){
+			//int idx_c = (i * PAR_N  + Ji) * PAR_L;
+			chall->c[i][l] = state->c[idx_c + l];
+		}
 
+		memcpy(&chall->com[i * SECPAR], &com[idx * SECPAR], SECPAR);
+		//std::cout << "chall->com over " << std::endl;
 		//include all rands except the J_i-th one
-		memcpy(&chall->rand[i * (PAR_N - 1) * 2 * SECPAR],
-				&rand[i * PAR_N * 2 * SECPAR], Ji * 2 * SECPAR);
-		memcpy(&chall->rand[i * (PAR_N - 1) * 2 * SECPAR + Ji * 2 * SECPAR],
-				&rand[(i * PAR_N + Ji + 1) * 2 * SECPAR],
-				(PAR_N - 1 - Ji) * 2 * SECPAR);
+		memcpy(&chall->rand[i * (PAR_N - 1) * (PAR_L + 1) * SECPAR],
+				&rand[i * PAR_N * (PAR_L + 1) * SECPAR], Ji * (PAR_L + 1) * SECPAR);
+				//std::cout << "rand to chall_rand 1 " << i << std::endl;
+		memcpy(&chall->rand[i * (PAR_N - 1) * (PAR_L + 1) * SECPAR + Ji * (PAR_L + 1) * SECPAR],
+				&rand[(i * PAR_N + Ji + 1) * (PAR_L + 1) * SECPAR],
+				(PAR_N - 1 - Ji) * (PAR_L + 1) * SECPAR);
+				//std::cout << "rand to chall_rand 2 " << i <<std::endl;
 	}
+	std::cout << "second loop over " << std::endl;
 
 }
 
@@ -103,6 +132,7 @@ bool user_finalize(user_state *state, challenge *chall, response *resp,
 		signature &sig) {
 
 	// Step 1: Recompute final component pk_K of the sharing
+	std::cout << "user_finalize start " << std::endl;
 	G1 pk_sharing_G1[PAR_K];
 	G2 pk_sharing_G2[PAR_K + 1]; //one more element to make Step 3 efficient
 	G1 sum_G1;
@@ -142,45 +172,76 @@ bool user_finalize(user_state *state, challenge *chall, response *resp,
 	}
 
 	// Step 3: Check correctness of the aggregated response
-	G1 cs_and_add_resp[PAR_K + 1];
-	G1::neg(cs_and_add_resp[PAR_K], resp->agg_resp);
+	G1 cs_and_add_resp[PAR_L][PAR_K + 1];
+	for (int l = 0; l < PAR_L; ++l){
+		G1::neg(cs_and_add_resp[l][PAR_K], resp->agg_resp[l]);
+		for (int i = 0; i < PAR_K; ++i) {
+			cs_and_add_resp[l][i] = chall->c[i][l];
+		}
+	} 
+	//G1::neg(cs_and_add_resp[PAR_K], resp->agg_resp);
 	pk_sharing_G2[PAR_K] = state->ctx->g2;
-	for (int i = 0; i < PAR_K; ++i) {
-		cs_and_add_resp[i] = chall->c[i];
+	for (int l = 0; l < PAR_L; ++l){
+		millerLoopVec(tmp, cs_and_add_resp[l], pk_sharing_G2, PAR_K + 1);
+		finalExp(tmp, tmp);
+		if (!tmp.isOne()) {
+			return false;
+		}
 	}
-	millerLoopVec(tmp, cs_and_add_resp, pk_sharing_G2, PAR_K + 1);
-	finalExp(tmp, tmp);
-	if (!tmp.isOne()) {
-		return false;
-	}
+	//millerLoopVec(tmp, cs_and_add_resp, pk_sharing_G2, PAR_K + 1);
+	//finalExp(tmp, tmp);
+	//if (!tmp.isOne()) {
+	//	return false;
+	//}
 
 	// Step 4: Unblind the aggregated response
-	G1 agg_sig;
-	G1 shift;
-	Fr neg_alphas[PAR_K];
+	G1 agg_sig[PAR_L];
+	G1 shift[PAR_L];
+	Fr neg_alphas[PAR_L][PAR_K];
 	for (int i = 0; i < PAR_K; ++i) {
 		int Ji = chall->J[i];
-		int idx = i * PAR_N + Ji;
-		Fr::neg(neg_alphas[i], state->alphas[idx]);
+		int idx = (i * PAR_N + Ji) * PAR_L;
+		for (int l = 0; l < PAR_L; ++l){
+			Fr::neg(neg_alphas[l][i], state->alphas[idx+l]);
+		}
 	}
-	G1::mulVec(shift, pk_sharing_G1, neg_alphas, PAR_K);
-	G1::add(agg_sig, resp->agg_resp, shift);
-	// Rerandomize the key sharing
-	G1 selected_mu_hashes[PAR_K];
+	for (int l = 0; l < PAR_L; ++l){
+		G1::mulVec(shift[l], pk_sharing_G1, neg_alphas[l], PAR_K);
+		G1::add(agg_sig[l], resp->agg_resp[l], shift[l]);
+	}
+	//G1::mulVec(shift, pk_sharing_G1, neg_alphas, PAR_K);
+	//G1::add(agg_sig, resp->agg_resp, shift);
+	//Rerandomize the key sharing 
+	G1 selected_mu_hashes[PAR_L][PAR_K];
 	for (int i = 0; i < PAR_K; ++i) {
 		int Ji = chall->J[i];
-		int idx = i * PAR_N + Ji;
-		selected_mu_hashes[i] = state->mu_hashes[idx];
+		int idx = (i * PAR_N + Ji) * PAR_L;
+		for (int l = 0; l < PAR_L; ++l){
+			selected_mu_hashes[l][i] = state->mu_hashes[idx+l];
+		}
 	}
-	key_rerandomization(state->ctx, resp->pk_sharing, selected_mu_hashes,
-			agg_sig, sig.pk_sharing, sig.agg_sig);
+	for (int l = 0; l < PAR_L; ++l){
+		key_rerandomization(state->ctx, resp->pk_sharing, selected_mu_hashes[l],
+			agg_sig[l], sig.pk_sharing, sig.agg_sig[l]);
+	}
 
 	// Step 5: add the commitment randomness the signature
 	for (int i = 0; i < PAR_K; ++i) {
 		int Ji = chall->J[i];
-		int idx = i * PAR_N + Ji;
-		memcpy(&sig.com_rands[i * SECPAR], &state->varphis[idx * SECPAR],
+		int idx = (i * PAR_N + Ji) * PAR_L;
+		for (int l = 0; l < PAR_L; ++l){
+			memcpy(&sig.com_rands[i * SECPAR ][l * SECPAR], &state->varphis[(idx + l) * SECPAR],
 		SECPAR);
+		}
 	}
+	std::cout << "user_finalize over 1 " << std::endl;
+	std::ofstream outFile("datsignature.bin.new", std::ios::binary);
+    if (outFile) {
+        outFile.write(reinterpret_cast<const char*>(&sig), sizeof(sig));
+        outFile.close();
+    } else {
+        std::cerr << "无法打开文件进行写入" << std::endl;
+    }
+	std::cout << "user_finalize over 2  file make  " << std::endl;
 	return true;
 }
