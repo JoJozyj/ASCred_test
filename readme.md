@@ -51,4 +51,4 @@ We implement the batch partial blind siganture of Rai-Choo.
 
 The implementation is same as https://github.com/b-wagn/Raichoo.git. 
 
-mytest_ori.rs is a rust file, add it to https://github.com/CharmsDev/polymath/test and run.
+mytest_ori.rs is a rust file, add it to https://github.com/CharmsDev/polymath and run.
